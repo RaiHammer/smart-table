@@ -91,3 +91,54 @@ const appRoot = document.querySelector('#app');
 appRoot.appendChild(sampleTable.container);
 
 render();
+
+
+
+
+const tasks = [
+  { data: 'A', delay: 1000 },
+  { data: 'B', delay: 500 },
+  { data: 'C', delay: 1500 },
+  { data: 'D', delay: 200 }
+];
+
+function fetchWithDelay(data, delay) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (Math.random() < 0.9) resolve({ data, status: 'ok' });
+      else reject({ data, error: 'Failed' });
+    }, delay);
+  });
+}
+
+async function runParallel(tasks, maxConcurrent) {
+  const results = [];
+  const executing = [];
+  let index = 0;
+
+  for (const task of tasks) {
+    const currentIndex = index++;
+    const promise = fetchWithDelay(task.data, task.delay)
+      .then(result => {
+        results[currentIndex] = result;
+      })
+      .catch(error => {
+        results[currentIndex] = error;
+        throw error; // Прерываем цепочку при ошибке
+      });
+
+    executing.push(promise);
+    promise.finally(() => executing.splice(executing.indexOf(promise), 1));
+
+    if (executing.length >= maxConcurrent) {
+      await Promise.race(executing);
+    }
+  }
+
+  await Promise.all(executing);
+  return results;
+}
+
+runParallel(tasks, 2)
+  .then(console.log)  // При успехе: [{data: 'A', status: 'ok'}, ...]
+  .catch(console.error);  // При ошибке: {data: 'X', error: 'Failed'}
